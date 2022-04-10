@@ -241,7 +241,7 @@ class Screen:
 
         return ["".join(render(self.buffer[y])) for y in range(self.lines)]
 
-    def reset(self):
+    def reset(self, start=0, end=0, source=b""):
         """Reset the terminal to its initial state.
 
         * Scrolling margins are reset to screen boundaries.
@@ -281,7 +281,7 @@ class Screen:
 
         self.saved_columns = None
 
-    def resize(self, lines=None, columns=None):
+    def resize(self, lines=None, columns=None, start=0, end=0, source=b""):
         """Resize the screen to the given size.
 
         If the requested screen size has more lines than the existing
@@ -322,7 +322,7 @@ class Screen:
         self.lines, self.columns = lines, columns
         self.set_margins()
 
-    def set_margins(self, top=None, bottom=None):
+    def set_margins(self, top=None, bottom=None, start=0, end=0, source=b""):
         """Select top and bottom margins for the scrolling region.
 
         :param int top: the smallest line number that is scrolled.
@@ -357,7 +357,7 @@ class Screen:
             # bottom margins of the scrolling region (DECSTBM) changes.
             self.cursor_position()
 
-    def set_mode(self, *modes, **kwargs):
+    def set_mode(self, *modes, start=0, end=0, source=b"", **kwargs):
         """Set (enable) a given list of modes.
 
         :param list modes: modes to set, where each mode is a constant
@@ -397,7 +397,7 @@ class Screen:
         if mo.DECTCEM in modes:
             self.cursor.hidden = False
 
-    def reset_mode(self, *modes, **kwargs):
+    def reset_mode(self, *modes, start=0, end=0, source=b"", **kwargs):
         """Reset (disable) a given list of modes.
 
         :param list modes: modes to reset -- hopefully, each mode is a
@@ -435,7 +435,7 @@ class Screen:
         if mo.DECTCEM in modes:
             self.cursor.hidden = True
 
-    def define_charset(self, code, mode):
+    def define_charset(self, code, mode, start=0, end=0, source=b""):
         """Define ``G0`` or ``G1`` charset.
 
         :param str code: character set code, should be a character
@@ -451,15 +451,15 @@ class Screen:
             elif mode == ")":
                 self.g1_charset = cs.MAPS[code]
 
-    def shift_in(self):
+    def shift_in(self, start=0, end=0, source=b""):
         """Select ``G0`` character set."""
         self.charset = 0
 
-    def shift_out(self):
+    def shift_out(self, start=0, end=0, source=b""):
         """Select ``G1`` character set."""
         self.charset = 1
 
-    def draw(self, data):
+    def draw(self, data, start=0, end=0, source=b""):
         """Display decoded characters at the current cursor position and
         advances the cursor if :data:`~pyte.modes.DECAWM` is set.
 
@@ -526,25 +526,25 @@ class Screen:
 
         self.dirty.add(self.cursor.y)
 
-    def set_title(self, param):
+    def set_title(self, param, start=0, end=0, source=b""):
         """Set terminal title.
 
         .. note:: This is an XTerm extension supported by the Linux terminal.
         """
         self.title = param
 
-    def set_icon_name(self, param):
+    def set_icon_name(self, param, start=0, end=0, source=b""):
         """Set icon name.
 
         .. note:: This is an XTerm extension supported by the Linux terminal.
         """
         self.icon_name = param
 
-    def carriage_return(self):
+    def carriage_return(self, start=0, end=0, source=b""):
         """Move the cursor to the beginning of the current line."""
         self.cursor.x = 0
 
-    def index(self):
+    def index(self, start=0, end=0, source=b""):
         """Move the cursor down one line in the same column. If the
         cursor is at the last line, create a new line at the bottom.
         """
@@ -558,7 +558,7 @@ class Screen:
         else:
             self.cursor_down()
 
-    def reverse_index(self):
+    def reverse_index(self, start=0, end=0, source=b""):
         """Move the cursor up one line in the same column. If the cursor
         is at the first line, create a new line at the top.
         """
@@ -572,7 +572,7 @@ class Screen:
         else:
             self.cursor_up()
 
-    def linefeed(self):
+    def linefeed(self, start=0, end=0, source=b""):
         """Perform an index and, if :data:`~pyte.modes.LNM` is set, a
         carriage return.
         """
@@ -581,7 +581,7 @@ class Screen:
         if mo.LNM in self.mode:
             self.carriage_return()
 
-    def tab(self):
+    def tab(self, start=0, end=0, source=b""):
         """Move to the next tab space, or the end of the screen if there
         aren't anymore left.
         """
@@ -594,13 +594,13 @@ class Screen:
 
         self.cursor.x = column
 
-    def backspace(self):
+    def backspace(self, start=0, end=0, source=b""):
         """Move cursor to the left one or keep it in its position if
         it's at the beginning of the line already.
         """
         self.cursor_back()
 
-    def save_cursor(self):
+    def save_cursor(self, start=0, end=0, source=b""):
         """Push the current cursor position onto the stack."""
         self.savepoints.append(Savepoint(copy.copy(self.cursor),
                                          self.g0_charset,
@@ -609,7 +609,7 @@ class Screen:
                                          mo.DECOM in self.mode,
                                          mo.DECAWM in self.mode))
 
-    def restore_cursor(self):
+    def restore_cursor(self, start=0, end=0, source=b""):
         """Set the current cursor position to whatever cursor is on top
         of the stack.
         """
@@ -634,7 +634,7 @@ class Screen:
             self.reset_mode(mo.DECOM)
             self.cursor_position()
 
-    def insert_lines(self, count=None):
+    def insert_lines(self, count=None, start=0, end=0, source=b""):
         """Insert the indicated # of lines at line with cursor. Lines
         displayed **at** and below the cursor move down. Lines moved
         past the bottom margin are lost.
@@ -654,7 +654,7 @@ class Screen:
 
             self.carriage_return()
 
-    def delete_lines(self, count=None):
+    def delete_lines(self, count=None, start=0, end=0, source=b""):
         """Delete the indicated # of lines, starting at line with
         cursor. As lines are deleted, lines displayed below cursor
         move up. Lines added to bottom of screen have spaces with same
@@ -677,7 +677,7 @@ class Screen:
 
             self.carriage_return()
 
-    def insert_characters(self, count=None):
+    def insert_characters(self, count=None, start=0, end=0, source=b""):
         """Insert the indicated # of blank characters at the cursor
         position. The cursor does not move and remains at the beginning
         of the inserted blank characters. Data on the line is shifted
@@ -694,7 +694,7 @@ class Screen:
                 line[x + count] = line[x]
             line.pop(x, None)
 
-    def delete_characters(self, count=None):
+    def delete_characters(self, count=None, start=0, end=0, source=b""):
         """Delete the indicated # of characters, starting with the
         character at cursor position. When a character is deleted, all
         characters to the right of cursor move left. Character attributes
@@ -712,7 +712,7 @@ class Screen:
             else:
                 line.pop(x, None)
 
-    def erase_characters(self, count=None):
+    def erase_characters(self, count=None, start=0, end=0, source=b""):
         """Erase the indicated # of characters, starting with the
         character at cursor position. Character attributes are set
         cursor attributes. The cursor remains in the same position.
@@ -734,7 +734,7 @@ class Screen:
                        min(self.cursor.x + count, self.columns)):
             line[x] = self.cursor.attrs
 
-    def erase_in_line(self, how=0, private=False):
+    def erase_in_line(self, how=0, private=False, start=0, end=0, source=b""):
         """Erase a line in a specific way.
 
         Character attributes are set to cursor attributes.
@@ -761,7 +761,7 @@ class Screen:
         for x in interval:
             line[x] = self.cursor.attrs
 
-    def erase_in_display(self, how=0, *args, **kwargs):
+    def erase_in_display(self, how=0, *args, start=0, end=0, source=b"", **kwargs):
         """Erases display in a specific way.
 
         Character attributes are set to cursor attributes.
@@ -800,11 +800,11 @@ class Screen:
         if how == 0 or how == 1:
             self.erase_in_line(how)
 
-    def set_tab_stop(self):
+    def set_tab_stop(self, start=0, end=0, source=b""):
         """Set a horizontal tab stop at cursor position."""
         self.tabstops.add(self.cursor.x)
 
-    def clear_tab_stop(self, how=0):
+    def clear_tab_stop(self, how=0, start=0, end=0, source=b""):
         """Clear a horizontal tab stop.
 
         :param int how: defines a way the tab stop should be cleared:
@@ -820,11 +820,11 @@ class Screen:
         elif how == 3:
             self.tabstops = set()  # Clears all horizontal tab stops.
 
-    def ensure_hbounds(self):
+    def ensure_hbounds(self, start=0, end=0, source=b""):
         """Ensure the cursor is within horizontal screen bounds."""
         self.cursor.x = min(max(0, self.cursor.x), self.columns - 1)
 
-    def ensure_vbounds(self, use_margins=None):
+    def ensure_vbounds(self, use_margins=None, start=0, end=0, source=b""):
         """Ensure the cursor is within vertical screen bounds.
 
         :param bool use_margins: when ``True`` or when
@@ -839,7 +839,7 @@ class Screen:
 
         self.cursor.y = min(max(top, self.cursor.y), bottom)
 
-    def cursor_up(self, count=None):
+    def cursor_up(self, count=None, start=0, end=0, source=b""):
         """Move cursor up the indicated # of lines in same column.
         Cursor stops at top margin.
 
@@ -848,7 +848,7 @@ class Screen:
         top, _bottom = self.margins or Margins(0, self.lines - 1)
         self.cursor.y = max(self.cursor.y - (count or 1), top)
 
-    def cursor_up1(self, count=None):
+    def cursor_up1(self, count=None, start=0, end=0, source=b""):
         """Move cursor up the indicated # of lines to column 1. Cursor
         stops at bottom margin.
 
@@ -857,7 +857,7 @@ class Screen:
         self.cursor_up(count)
         self.carriage_return()
 
-    def cursor_down(self, count=None):
+    def cursor_down(self, count=None, start=0, end=0, source=b""):
         """Move cursor down the indicated # of lines in same column.
         Cursor stops at bottom margin.
 
@@ -866,7 +866,7 @@ class Screen:
         _top, bottom = self.margins or Margins(0, self.lines - 1)
         self.cursor.y = min(self.cursor.y + (count or 1), bottom)
 
-    def cursor_down1(self, count=None):
+    def cursor_down1(self, count=None, start=0, end=0, source=b""):
         """Move cursor down the indicated # of lines to column 1.
         Cursor stops at bottom margin.
 
@@ -875,7 +875,7 @@ class Screen:
         self.cursor_down(count)
         self.carriage_return()
 
-    def cursor_back(self, count=None):
+    def cursor_back(self, count=None, start=0, end=0, source=b""):
         """Move cursor left the indicated # of columns. Cursor stops
         at left margin.
 
@@ -889,7 +889,7 @@ class Screen:
         self.cursor.x -= count or 1
         self.ensure_hbounds()
 
-    def cursor_forward(self, count=None):
+    def cursor_forward(self, count=None, start=0, end=0, source=b""):
         """Move cursor right the indicated # of columns. Cursor stops
         at right margin.
 
@@ -898,7 +898,7 @@ class Screen:
         self.cursor.x += count or 1
         self.ensure_hbounds()
 
-    def cursor_position(self, line=None, column=None):
+    def cursor_position(self, line=None, column=None, start=0, end=0, source=b""):
         """Set the cursor to a specific `line` and `column`.
 
         Cursor is allowed to move out of the scrolling region only when
@@ -925,7 +925,7 @@ class Screen:
         self.ensure_hbounds()
         self.ensure_vbounds()
 
-    def cursor_to_column(self, column=None):
+    def cursor_to_column(self, column=None, start=0, end=0, source=b""):
         """Move cursor to a specific column in the current line.
 
         :param int column: column number to move the cursor to.
@@ -933,7 +933,7 @@ class Screen:
         self.cursor.x = (column or 1) - 1
         self.ensure_hbounds()
 
-    def cursor_to_line(self, line=None):
+    def cursor_to_line(self, line=None, start=0, end=0, source=b""):
         """Move cursor to a specific line in the current column.
 
         :param int line: line number to move the cursor to.
@@ -950,19 +950,19 @@ class Screen:
 
         self.ensure_vbounds()
 
-    def bell(self, *args):
+    def bell(self, *args, start=0, end=0, source=b""):
         """Bell stub -- the actual implementation should probably be
         provided by the end-user.
         """
 
-    def alignment_display(self):
+    def alignment_display(self, start=0, end=0, source=b""):
         """Fills screen with uppercase E's for screen focus and alignment."""
         self.dirty.update(range(self.lines))
         for y in range(self.lines):
             for x in range(self.columns):
                 self.buffer[y][x] = self.buffer[y][x]._replace(data="E")
 
-    def select_graphic_rendition(self, *attrs):
+    def select_graphic_rendition(self, *attrs, start=0, end=0, source=b""):
         """Set display attributes.
 
         :param list attrs: a list of display attributes to set.
@@ -1010,7 +1010,7 @@ class Screen:
 
         self.cursor.attrs = self.cursor.attrs._replace(**replace)
 
-    def report_device_attributes(self, mode=0, **kwargs):
+    def report_device_attributes(self, mode=0, start=0, end=0, source=b"", **kwargs):
         """Report terminal identity.
 
         .. versionadded:: 0.5.0
@@ -1025,7 +1025,7 @@ class Screen:
         if mode == 0 and not kwargs.get("private"):
             self.write_process_input(ctrl.CSI + "?6c")
 
-    def report_device_status(self, mode):
+    def report_device_status(self, mode, start=0, end=0, source=b""):
         """Report terminal status or cursor position.
 
         :param int mode: if 5 -- terminal status, 6 -- cursor position,
@@ -1044,7 +1044,7 @@ class Screen:
                 y -= self.margins.top
             self.write_process_input(ctrl.CSI + "{0};{1}R".format(y, x))
 
-    def write_process_input(self, data):
+    def write_process_input(self, data, start=0, end=0, source=b""):
         """Write data to the process running inside the terminal.
 
         By default is a noop.
@@ -1054,7 +1054,7 @@ class Screen:
         .. versionadded:: 0.5.0
         """
 
-    def debug(self, *args, **kwargs):
+    def debug(self, *args, start=0, end=0, source=b"", **kwargs):
         """Endpoint for unrecognized escape sequences.
 
         By default is a noop.

@@ -135,6 +135,7 @@ class Stream:
         self.listener = None
         self.strict = strict
         self.use_utf8 = True
+        self._data = b""
 
         if screen is not None:
             self.attach(screen)
@@ -178,6 +179,8 @@ class Stream:
         match_text = self._text_pattern.match
         taking_plain_text = self._taking_plain_text
 
+        self._data = data
+
         length = len(data)
         offset = 0
         while offset < length:
@@ -189,14 +192,14 @@ class Stream:
                 else:
                     taking_plain_text = False
             else:
-                taking_plain_text = send(data[offset:offset + 1])
+                taking_plain_text = send(data[offset], offset)
                 offset += 1
 
         self._taking_plain_text = taking_plain_text
 
-    def _send_to_parser(self, data):
+    def _send_to_parser(self, char, offset):
         try:
-            return self._parser.send(data)
+            return self._parser.send((char, offset))
         except Exception:
             # Reset the parser state to make sure it is usable even
             # after receiving an exception. See PR #101 for details.
@@ -245,7 +248,8 @@ class Stream:
             # ``True`` tells ``Screen.feed`` that it is allowed to send
             # chunks of plain text directly to the listener, instead
             # of this generator.
-            char = yield True
+            char, offset = yield True
+            start = offset
 
             if char == ESC:
                 # Most non-VT52 commands start with a left-bracket after the
@@ -259,24 +263,25 @@ class Stream:
                 #    recognizes ``ESC % C`` sequences for selecting control
                 #    character set. However, in the current version these
                 #    are noop.
-                char = yield
+                char, offset = yield
                 if char == "[":
                     char = CSI_C1  # Go to CSI.
                 elif char == "]":
                     char = OSC_C1  # Go to OSC.
                 else:
                     if char == "#":
-                        sharp_dispatch[(yield)]()
+                        char2, offset = yield
+                        sharp_dispatch[char2](start=start, end=offset, source=self._data)
                     elif char == "%":
-                        self.select_other_charset((yield))
+                        char2, offset = yield
+                        self.select_other_charset(char2, start=start, end=offset, source=self._data)
                     elif char in "()":
-                        code = yield
                         if self.use_utf8:
                             continue
-
                         # See http://www.cl.cam.ac.uk/~mgk25/unicode.html#term
                         # for the why on the UTF-8 restriction.
-                        listener.define_charset(code, mode=char)
+                        char2, offset = yield
+                        listener.define_charset(char2, mode=char, start=start, end=offset, source=self._data)
                     else:
                         escape_dispatch[char]()
                     continue    # Don't go to CSI.
@@ -288,7 +293,7 @@ class Stream:
                 if (char == ctrl.SI or char == ctrl.SO) and self.use_utf8:
                     continue
 
-                basic_dispatch[char]()
+                basic_dispatch[char](start=start, end=offset, source=self._data)
             elif char == CSI_C1:
                 # All parameters are unsigned, positive decimal integers, with
                 # the most significant digit sent first. Any parameter greater
@@ -307,11 +312,11 @@ class Stream:
                 current = ""
                 private = False
                 while True:
-                    char = yield
+                    char, offset = yield
                     if char == "?":
                         private = True
                     elif char in ALLOWED_IN_CSI:
-                        basic_dispatch[char]()
+                        basic_dispatch[char](start=start, end=offset, source=self._data)
                     elif char in SP_OR_GT:
                         pass  # Secondary DA is not supported atm.
                     elif char in CAN_OR_SUB:
@@ -319,7 +324,7 @@ class Stream:
                         # current sequence is aborted; terminal displays
                         # the substitute character, followed by characters
                         # in the sequence received after CAN or SUB.
-                        draw(char)
+                        draw(char, start=start, end=offset, source=self._data)
                         break
                     elif char.isdigit():
                         current += char
@@ -335,34 +340,35 @@ class Stream:
                             current = ""
                         else:
                             if private:
-                                csi_dispatch[char](*params, private=True)
+                                csi_dispatch[char](*params, private=True, start=start, end=offset, source=self._data)
                             else:
-                                csi_dispatch[char](*params)
+                                csi_dispatch[char](*params, start=start, end=offset, source=self._data)
                             break  # CSI is finished.
             elif char == OSC_C1:
-                code = yield
-                if code == "R":
+                char2, offset = yield
+                if char2 == "R":
                     continue  # Reset palette. Not implemented.
-                elif code == "P":
+                elif char2 == "P":
                     continue  # Set palette. Not implemented.
 
                 param = ""
                 while True:
-                    char = yield
+                    char, offset = yield
                     if char == ESC:
-                        char += yield
+                        char2, offset = yield
+                        char += char2
                     if char in OSC_TERMINATORS:
                         break
                     else:
                         param += char
 
                 param = param[1:]  # Drop the ;.
-                if code in "01":
-                    listener.set_icon_name(param)
-                if code in "02":
-                    listener.set_title(param)
+                if char2 in "01":
+                    listener.set_icon_name(param, start=start, end=offset, source=self._data)
+                if char2 in "02":
+                    listener.set_title(param, start=start, end=offset, source=self._data)
             elif char not in NUL_OR_DEL:
-                draw(char)
+                draw(char, start=start, end=offset, source=self._data)
 
     def select_other_charset(self, code):
         """Select other (non G0 or G1) charset.
